@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ar">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>لوحة تحكم الادمن</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      padding: 20px;
+      direction: rtl;
+      background: #f0f0f0;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1em;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: white;
+    }
+
+    th,
+    td {
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      text-align: center;
+    }
+
+    th {
+      background-color: #007bff;
+      color: white;
+    }
+
+    #messages {
+      margin-top: 40px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 80px;
+      resize: vertical;
+    }
+
+    input[type="email"] {
+      width: 300px;
+      padding: 8px;
+      margin-top: 10px;
+    }
+
+    .response {
+      margin-top: 10px;
+      font-weight: bold;
+      color: green;
+    }
+
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>لوحة تحكم الادمن</h1>
+
+  <button id="logoutBtn">تسجيل خروج</button>
+
+  <h2>بيانات المستخدمين المرسلة</h2>
+  <table id="usersTable">
+    <thead>
+      <tr>
+        <th>الاسم</th>
+        <th>البريد الإلكتروني</th>
+        <th>رقم التليفون</th>
+        <th>تاريخ الإرسال</th>
+        <th>حذف</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- هنا تظهر بيانات المستخدمين -->
+    </tbody>
+  </table>
+
+  <div id="messages">
+    <h2>إرسال رسالة إلى مستخدم</h2>
+
+    <label for="emailInput">البريد الإلكتروني للمستخدم:</label><br />
+    <input type="email" id="emailInput" placeholder="example@domain.com" required /><br />
+
+    <label for="messageInput">نص الرسالة:</label><br />
+    <textarea id="messageInput" placeholder="اكتب رسالتك هنا..." required></textarea><br />
+
+    <button id="sendMessageBtn">إرسال رسالة</button>
+
+    <p id="sendResponse" class="response"></p>
+  </div>
+
+  <div id="sentMessages">
+    <h2>الرسائل المرسلة</h2>
+    <table id="sentMessagesTable">
+      <thead>
+        <tr>
+          <th>البريد الإلكتروني</th>
+          <th>الرسالة</th>
+          <th>تاريخ الإرسال</th>
+          <th>حذف</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- هنا تظهر الرسائل المرسلة -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const usersTableBody = document.querySelector("#usersTable tbody");
+    const sentMessagesTableBody = document.querySelector("#sentMessagesTable tbody");
+    const logoutBtn = document.getElementById('logoutBtn');
+    const sendMessageBtn = document.getElementById('sendMessageBtn');
+    const emailInput = document.getElementById('emailInput');
+    const messageInput = document.getElementById('messageInput');
+    const sendResponse = document.getElementById('sendResponse');
+
+    // تحميل بيانات المستخدمين وعرضها
+    async function loadUsers() {
+      try {
+        const res = await fetch('/api/admin/users');
+        if (!res.ok) throw new Error('خطأ في تحميل بيانات المستخدمين');
+        const users = await res.json();
+
+        usersTableBody.innerHTML = '';
+        users.forEach(user => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${user.name}</td>
+            <td>${user.email}</td>
+            <td>${user.phone}</td>
+            <td>${new Date(user.receivedAt).toLocaleString('ar-EG')}</td>
+            <td><button data-email="${user.email}">🗑️</button></td>
+          `;
+          usersTableBody.appendChild(tr);
+        });
+
+        // حذف مستخدم عند الضغط على زر الحذف
+        usersTableBody.querySelectorAll('button').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const emailToDelete = btn.getAttribute('data-email');
+            if (!confirm(`هل أنت متأكد من حذف المستخدم: ${emailToDelete} ؟`)) return;
+
+            try {
+              const res = await fetch(`/api/admin/user/${encodeURIComponent(emailToDelete)}`, {
+                method: 'DELETE'
+              });
+              const data = await res.json();
+              if (res.ok) {
+                alert(data.message);
+                loadUsers();
+              } else {
+                alert(data.error || 'حدث خطأ أثناء الحذف');
+              }
+            } catch {
+              alert('تعذر الاتصال بالخادم');
+            }
+          });
+        });
+
+      } catch (error) {
+        usersTableBody.innerHTML = '<tr><td colspan="5">تعذر تحميل بيانات المستخدمين</td></tr>';
+      }
+    }
+
+    // تحميل الرسائل المرسلة وعرضها
+    async function loadMessages() {
+      try {
+        const res = await fetch('/api/admin/messages');
+        if (!res.ok) throw new Error('خطأ في تحميل الرسائل');
+        const messages = await res.json();
+
+        sentMessagesTableBody.innerHTML = '';
+        messages.forEach(msg => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${msg.email}</td>
+            <td>${msg.message}</td>
+            <td>${new Date(msg.sentAt).toLocaleString('ar-EG')}</td>
+            <td><button data-email="${msg.email}">🗑️</button></td>
+          `;
+          sentMessagesTableBody.appendChild(tr);
+        });
+
+        // حذف رسالة عند الضغط على زر الحذف
+        sentMessagesTableBody.querySelectorAll('button').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const emailToDelete = btn.getAttribute('data-email');
+            if (!confirm(`هل أنت متأكد من حذف الرسالة المرسلة إلى: ${emailToDelete} ؟`)) return;
+
+            try {
+              const res = await fetch('/api/admin/message', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: emailToDelete })
+              });
+              const data = await res.json();
+              if (res.ok) {
+                alert(data.message);
+                loadMessages();
+              } else {
+                alert(data.error || 'حدث خطأ أثناء الحذف');
+              }
+            } catch {
+              alert('تعذر الاتصال بالخادم');
+            }
+          });
+        });
+
+      } catch (error) {
+        sentMessagesTableBody.innerHTML = '<tr><td colspan="4">تعذر تحميل الرسائل</td></tr>';
+      }
+    }
+
+    // إرسال رسالة إلى مستخدم
+    sendMessageBtn.addEventListener('click', async () => {
+      const email = emailInput.value.trim();
+      const message = messageInput.value.trim();
+
+      if (!email || !message) {
+        sendResponse.textContent = 'يرجى تعبئة البريد الإلكتروني والرسالة';
+        sendResponse.classList.add('error');
+        return;
+      }
+      sendResponse.textContent = '';
+      sendResponse.classList.remove('error');
+
+      try {
+        const res = await fetch('/api/admin/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, message })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          sendResponse.textContent = data.message;
+          emailInput.value = '';
+          messageInput.value = '';
+          loadMessages();
+        } else {
+          sendResponse.textContent = data.error || 'حدث خطأ أثناء إرسال الرسالة';
+          sendResponse.classList.add('error');
+        }
+      } catch {
+        sendResponse.textContent = 'تعذر الاتصال بالخادم';
+        sendResponse.classList.add('error');
+      }
+    });
+
+    // تسجيل خروج الادمن
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/admin/logout', { method: 'POST' });
+        if (res.ok) {
+          window.location.href = '/admin-login.html';
+        } else {
+          alert('حدث خطأ أثناء تسجيل الخروج');
+        }
+      } catch {
+        alert('تعذر الاتصال بالخادم');
+      }
+    });
+
+    // تحميل البيانات عند فتح الصفحة
+    loadUsers();
+    loadMessages();
+  </script>
+</body>
+
+</html>
