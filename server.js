@@ -108,9 +108,9 @@ app.post('/api/admin/message', checkAuth, async (req, res) => {
   try {
     // إرسال الإيميل
     await transporter.sendMail({
-      from: `"gizaresult" <${process.env.SMTP_USER}>`,
+      from: `"story-stories" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: 'gizaresult',
+      subject: 'story-stories',
       text: message,
       html: `<p>${message}</p>`
     });
